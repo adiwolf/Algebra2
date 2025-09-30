@@ -1,104 +1,73 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>אלגברה ליניארית: אופרטורים ופירוק SVD</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Added KaTeX for math rendering -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
-<script
-  defer
-  src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
-  crossorigin="anonymous"
-  onload="renderMathInElement(document.body,{
-    delimiters:[
-      {left:'$$', right:'$$', display:true},
-      {left:'$',  right:'$',  display:false},
-      {left:'\\(', right:'\\)', display:false},
-      {left:'\\[', right:'\\]', display:true}
-    ],
-    throwOnError:false
-  });">
-</script>
- <!-- Chosen Palette: Warm Neutrals (Slate, Zinc) with a Teal accent -->
-    <!-- Application Structure Plan: A single-page application with a fixed side navigation bar to switch between thematic sections derived from the presentation slides. This structure provides a clear, logical flow for learning, moving from foundational concepts to advanced topics like the Spectral Theorem and SVD. The core interactive element is the SVD visualizer, designed to make the abstract geometric interpretation of SVD (rotation, scaling, rotation) tangible. Users can input their own 2x2 matrix and see its effect on the unit circle, which is a far more effective learning tool than static text. -->
-    <!-- Visualization & Content Choices: 
-        - Report Info: Operator Definitions. Goal: Organize/Compare. Viz/Method: Side-by-side cards in a grid layout. Interaction: Clear visual separation for easy comparison. Justification: This format is ideal for comparing distinct but related definitions.
-        - Report Info: SVD formula and components. Goal: Inform/Explain. Viz/Method: Textual explanation paired with an interactive Canvas visualization. Interaction: User inputs a 2x2 matrix, and a Chart.js scatter plot animates the transformation of the unit circle, showing the effects of V*, Sigma, and U sequentially. Library: Chart.js. Justification: This transforms a complex, abstract concept into an engaging and intuitive visual experience, directly demonstrating its geometric meaning.
-        - Report Info: Other concepts (Functionals, Spectral Theorem). Goal: Inform. Viz/Method: Cleanly formatted text cards. Interaction: None. Justification: These are foundational definitions where clear, well-structured text is the most effective presentation method. -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-    <style>
-        body {
-            font-family: 'Assistant', sans-serif;
-        }
-        .katex-display {
-            display: block;
-            text-align: center;
-            margin: 1em 0;
-        }
-        .katex {
-            font-size: 1.1em; irection: ltr;
-        }
-        .katex-display { direction: ltr; }
-        .nav-link.active {
-            background-color: #0d9488;
-            color: white;
-        }
-        .content-section {
-            display: none;
-        }
-        .content-section.active {
-            display: block;
-        }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 450px;
-            height: 450px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .quiz-feedback {
-            display: none;
-            padding: 0.75rem;
-            margin-top: 0.75rem;
-            border-radius: 0.5rem;
-            border-left-width: 4px;
-        }
-        .quiz-feedback.correct {
-            background-color: #f0fdf4;
-            color: #166534;
-            border-color: #22c55e;
-        }
-        .quiz-feedback.incorrect {
-            background-color: #fef2f2;
-            color: #991b1b;
-            border-color: #ef4444;
-        }
-        .match-item.selected {
-            background-color: #0d9488; /* teal-600 */
-            color: white;
-            border-color: #0f766e; /* teal-700 */
-        }
-        .match-item.correct {
-            background-color: #22c55e; /* green-500 */
-            color: white;
-            border-color: #16a34a; /* green-600 */
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-        .match-item.incorrect {
-            background-color: #ef4444; /* red-500 */
-            color: white;
-            border-color: #dc2626; /* red-600 */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>אלגברה ליניארית: אופרטורים ופירוק SVD</title>
+
+  <!-- Tailwind & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    body { font-family: 'Assistant', sans-serif; }
+
+    /* חשוב: לכפות LTR ולבודד את הבידירקשן רק בתוך KaTeX */
+    .katex,
+    .katex-display {
+      direction: ltr !important;
+      unicode-bidi: isolate !important; /* מונע זליגה של RTL פנימה */
+    }
+
+    /* עיצוב תצוגה */
+    .katex-display {
+      display: block;
+      text-align: center;  /* מרכז את הנוסחה כבלוק */
+      margin: 1em 0;
+    }
+
+    /* אופציונלי: עטיפת טקסט שמכיל הרבה מתמטיקה */
+    .math-ltr { direction: ltr; unicode-bidi: isolate; }
+
+    .nav-link.active { background-color: #0d9488; color: white; }
+    .content-section { display: none; }
+    .content-section.active { display: block; }
+    .chart-container { position: relative; width: 100%; max-width: 450px; height: 450px; margin-inline: auto; }
+    .quiz-feedback { display: none; padding: .75rem; margin-top: .75rem; border-radius: .5rem; border-left-width: 4px; }
+    .quiz-feedback.correct { background-color: #f0fdf4; color: #166534; border-color: #22c55e; }
+    .quiz-feedback.incorrect { background-color: #fef2f2; color: #991b1b; border-color: #ef4444; }
+    .match-item.selected { background-color: #0d9488; color: white; border-color: #0f766e; }
+    .match-item.correct { background-color: #22c55e; color: white; border-color: #16a34a; opacity: .7; cursor: not-allowed; }
+    .match-item.incorrect { background-color: #ef4444; color: white; border-color: #dc2626; }
+  </style>
+
+  <script>
+    // לרנדר רק כש־DOM מוכן, ולהתעלם מתגים שלא רוצים לרנדר בהם
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$",  right: "$",  display: false},
+          {left: "\\(", right: "\\)", display: false},
+          {left: "\\[", right: "\\]", display: true}
+        ],
+        ignoredTags: ["script","noscript","style","textarea","pre","code"],
+        throwOnError: false
+      });
+    });
+  </script>
 </head>
 <body class="bg-slate-50 text-slate-800">
     <div id="app" class="flex flex-col md:flex-row min-h-screen">
