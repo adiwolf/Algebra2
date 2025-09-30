@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אלגברה ליניארית: אופרטורים ופירוק SVD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Added KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMeaOijjaOCLjvLupqrTEKirczEltgwCKf2aOux6cZMW5CI3i" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURPiLdVj5/p9sDkfrN2JCNsmmibeAXMW+1Ua59ZeCIzAbid8GkqIX0" crossorigin="anonymous"></script>
+    <!-- Chosen Palette: Warm Neutrals (Slate, Zinc) with a Teal accent -->
+    <!-- Application Structure Plan: A single-page application with a fixed side navigation bar to switch between thematic sections derived from the presentation slides. This structure provides a clear, logical flow for learning, moving from foundational concepts to advanced topics like the Spectral Theorem and SVD. The core interactive element is the SVD visualizer, designed to make the abstract geometric interpretation of SVD (rotation, scaling, rotation) tangible. Users can input their own 2x2 matrix and see its effect on the unit circle, which is a far more effective learning tool than static text. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Operator Definitions. Goal: Organize/Compare. Viz/Method: Side-by-side cards in a grid layout. Interaction: Clear visual separation for easy comparison. Justification: This format is ideal for comparing distinct but related definitions.
+        - Report Info: SVD formula and components. Goal: Inform/Explain. Viz/Method: Textual explanation paired with an interactive Canvas visualization. Interaction: User inputs a 2x2 matrix, and a Chart.js scatter plot animates the transformation of the unit circle, showing the effects of V*, Sigma, and U sequentially. Library: Chart.js. Justification: This transforms a complex, abstract concept into an engaging and intuitive visual experience, directly demonstrating its geometric meaning.
+        - Report Info: Other concepts (Functionals, Spectral Theorem). Goal: Inform. Viz/Method: Cleanly formatted text cards. Interaction: None. Justification: These are foundational definitions where clear, well-structured text is the most effective presentation method. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Assistant', sans-serif;
+        }
+        .katex-display {
+            display: block;
+            text-align: center;
+            margin: 1em 0;
+        }
+        .katex {
+            font-size: 1.1em;
+        }
+        .nav-link.active {
+            background-color: #0d9488;
+            color: white;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            height: 450px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .quiz-feedback {
+            display: none;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            border-radius: 0.5rem;
+            border-left-width: 4px;
+        }
+        .quiz-feedback.correct {
+            background-color: #f0fdf4;
+            color: #166534;
+            border-color: #22c55e;
+        }
+        .quiz-feedback.incorrect {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border-color: #ef4444;
+        }
+        .match-item.selected {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+            border-color: #0f766e; /* teal-700 */
+        }
+        .match-item.correct {
+            background-color: #22c55e; /* green-500 */
+            color: white;
+            border-color: #16a34a; /* green-600 */
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .match-item.incorrect {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border-color: #dc2626; /* red-600 */
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="app" class="flex flex-col md:flex-row min-h-screen">
+        <nav id="sidebar" class="w-full md:w-64 bg-slate-800 text-white p-4 md:p-6 transition-all duration-300">
+            <h1 class="text-2xl font-bold mb-8">ניווט</h1>
+            <ul class="space-y-3">
+                <li><a href="#concepts" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">מושגי יסוד</a></li>
+                <li><a href="#operators" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">סוגי אופרטורים</a></li>
+                <li><a href="#main-theorem" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">המשפט המרכזי</a></li>
+                <li><a href="#spectral-decomposition" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">הפירוק הספקטרלי</a></li>
+                <li><a href="#svd-intro" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">מבוא ל-SVD</a></li>
+                <li><a href="#svd-components" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">רכיבי SVD</a></li>
+                <li><a href="#svd-process" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">תהליך SVD</a></li>
+                <li><a href="#svd-interactive" class="nav-link block p-3 rounded-lg hover:bg-slate-700 transition-colors">הדגמת SVD</a></li>
+            </ul>
+        </nav>
+        
+        <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+            <header class="mb-10">
+                <h1 class="text-4xl md:text-5xl font-bold text-teal-600">אופרטורים במרחבי מכפלה פנימית ופירוק SVD</h1>
+                <p class="text-slate-500 mt-2 text-lg">חקירה אינטראקטיבית של מושגי מפתח באלגברה ליניארית</p>
+            </header>
+
+            <section id="concepts" class="content-section space-y-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">פונקציונל ליניארי</h2>
+                    <p><strong class="font-medium">הגדרה:</strong> העתקה ליניארית $f: V \to \mathbb{F}$, כאשר $V$ הוא מרחב וקטורי מעל השדה $\mathbb{F}$.</p>
+                    <div class="mt-4 p-4 bg-teal-50 border-r-4 border-teal-500 rounded">
+                        <h3 class="font-semibold">משפט ההצגה של ריס</h3>
+                        <p>במרחב מכפלה פנימית סוף-מימדי $V$, לכל פונקציונל ליניארי $f$ קיים וקטור יחיד $v_0 \in V$ כך שלכל $v \in V$ מתקיים: $f(v) = \langle v, v_0 \rangle$.</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">האופרטור הצמוד ($T^*$)</h2>
+                    <p><strong class="font-medium">הגדרה:</strong> לכל אופרטור ליניארי $T: V \to V$, קיים אופרטור יחיד $T^*: V \to V$, הנקרא האופרטור הצמוד, המקיים: $\langle Tv, u \rangle = \langle v, T^*u \rangle$ לכל $u, v \in V$.</p>
+                     <div class="mt-4 p-4 bg-slate-100 rounded">
+                        <h3 class="font-semibold">הצגה מטריציונית</h3>
+                        <p>אם $B$ הוא בסיס אורתונורמלי, אז המטריצה המייצגת של האופרטור הצמוד היא המטריצה הצמודה (טרנספוז + צמוד מרוכב): $[T^*]_B = [T]_B^*$.</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-2xl font-semibold text-teal-700 mb-6">בחן את עצמך: התאמות</h3>
+                    <p class="mb-8 text-slate-600">לחצו על פריט בעמודה אחת, ולאחר מכן על הפריט המתאים לו בעמודה השנייה כדי ליצור זוג.</p>
+                    <div class="mb-10">
+                        <h4 class="text-xl font-semibold mb-4">חלק א': התאמת וקטורי ריס לפונקציונלים</h4>
+                        <p class="text-sm mb-4 text-slate-500">בהינתן מרחב $\mathbb{R}^2$ עם המכפלה הפנימית הסטנדרטית, התאימו לכל פונקציונל $f(v)$ את הוקטור היחיד $v_0$ המקיים $f(v) = \langle v, v_0 \rangle$.</p>
+                        <div id="riesz-quiz" class="grid grid-cols-2 gap-4 md:gap-8">
+                            <div class="space-y-3">
+                                <button data-match-id="r1" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">f(x, y) = 2x - y</button>
+                                <button data-match-id="r2" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">f(x, y) = 3y</button>
+                                <button data-match-id="r3" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">f(x, y) = x</button>
+                            </div>
+                            <div class="space-y-3">
+                                <button data-match-id="r2" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors font-mono">(0, 3)</button>
+                                <button data-match-id="r3" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors font-mono">(1, 0)</button>
+                                <button data-match-id="r1" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors font-mono">(2, -1)</button>
+                            </div>
+                        </div>
+                        <p id="riesz-feedback" class="mt-4 text-center font-semibold h-6"></p>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-semibold mb-4">חלק ב': התאמת אופרטורים צמודים</h4>
+                        <p class="text-sm mb-4 text-slate-500">בהינתן מרחב $\mathbb{R}^2$ עם המכפלה הפנימית הסטנדרטית, התאימו לכל אופרטור $T$ את האופרטור הצמוד שלו $T^*$.</p>
+                        <div id="adjoint-quiz" class="grid grid-cols-2 gap-4 md:gap-8">
+                             <div class="space-y-3">
+                                <button data-match-id="a1" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T(x, y) = (-y, x)</button>
+                                <button data-match-id="a2" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T(x, y) = (0, x)</button>
+                                <button data-match-id="a3" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T(x, y) = (x+2y, -y)</button>
+                            </div>
+                            <div class="space-y-3">
+                                <button data-match-id="a3" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T*(x, y) = (x, 2x-y)</button>
+                                <button data-match-id="a1" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T*(x, y) = (y, -x)</button>
+                                <button data-match-id="a2" class="match-item w-full text-center p-3 border rounded-lg hover:bg-slate-100 transition-colors">T*(x, y) = (y, 0)</button>
+                            </div>
+                        </div>
+                        <p id="adjoint-feedback" class="mt-4 text-center font-semibold h-6"></p>
+                    </div>
+                    <div class="text-center mt-8">
+                        <button id="reset-quizzes" class="px-6 py-2 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 transition-colors">אפס בחנים</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="operators" class="content-section">
+                <p class="mb-6 text-lg">אופרטורים במרחבי מכפלה פנימית מסווגים לפי הקשר שלהם לאופרטור הצמוד שלהם. סיווג זה חושף תכונות גיאומטריות ומבניות חשובות.</p>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-teal-500">
+                        <h3 class="text-xl font-bold mb-3">צמוד עצמית (הרמיטי/סימטרי)</h3>
+                        <p class="font-mono text-center p-2 bg-slate-100 rounded mb-3">$T = T^*$</p>
+                        <ul class="list-disc list-inside space-y-2">
+                            <li>המטריצה המייצגת בבסיס א"נ היא הרמיטית ($A=A^*$).</li>
+                            <li>הערכים העצמיים שלו תמיד ממשיים.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-cyan-500">
+                        <h3 class="text-xl font-bold mb-3">אוניטרי / אורתוגונלי</h3>
+                        <p class="font-mono text-center p-2 bg-slate-100 rounded mb-3">$T^{-1} = T^*$</p>
+                        <ul class="list-disc list-inside space-y-2">
+                            <li>שומר על מכפלה פנימית (איזומטריה): $\langle Tv, Tu \rangle = \langle v, u \rangle$.</li>
+                            <li>הערכים העצמיים שלו בעלי ערך מוחלט 1.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-indigo-500 md:col-span-2 lg:col-span-1">
+                        <h3 class="text-xl font-bold mb-3">נורמלי</h3>
+                        <p class="font-mono text-center p-2 bg-slate-100 rounded mb-3">$TT^* = T^*T$</p>
+                        <ul class="list-disc list-inside space-y-2">
+                            <li>הכללה של שני הסוגים הקודמים.</li>
+                            <li>כל אופרטור צמוד עצמית או אוניטרי הוא גם נורמלי.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-10 bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-2xl font-semibold text-teal-700 mb-6">בחן את עצמך: נכון או לא נכון?</h3>
+                    <div class="space-y-6">
+                        <div class="quiz-question p-4 border rounded-lg">
+                            <p class="font-semibold text-lg">1. כל אופרטור נורמלי הוא גם אוניטרי.</p>
+                            <div class="mt-3 space-x-3 space-x-reverse">
+                                <button data-correct="true" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">לא נכון</button>
+                                <button data-correct="false" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">נכון</button>
+                            </div>
+                            <div class="quiz-feedback">
+                                <span class="font-bold">תשובה: לא נכון.</span>
+                                <span>אוניטריות היא תכונה חזקה יותר. אופרטור אוניטרי הוא תמיד נורמלי, אך ההפך אינו נכון. דוגמה נגדית: אופרטור האפס הוא נורמלי אך אינו הפיך, ולכן אינו אוניטרי.</span>
+                            </div>
+                        </div>
+
+                        <div class="quiz-question p-4 border rounded-lg">
+                            <p class="font-semibold text-lg">2. הערכים העצמיים של אופרטור צמוד עצמית הם תמיד ממשיים.</p>
+                            <div class="mt-3 space-x-3 space-x-reverse">
+                                <button data-correct="false" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">לא נכון</button>
+                                <button data-correct="true" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">נכון</button>
+                            </div>
+                            <div class="quiz-feedback">
+                                <span class="font-bold">תשובה: נכון.</span>
+                                <span>זוהי תכונה מרכזית של אופרטורים צמודים עצמית, כפי שמופיע בחומר הלימוד.</span>
+                            </div>
+                        </div>
+                        
+                        <div class="quiz-question p-4 border rounded-lg">
+                            <p class="font-semibold text-lg">3. אופרטור אוניטרי תמיד שומר על נורמה.</p>
+                            <div class="mt-3 space-x-3 space-x-reverse">
+                                <button data-correct="false" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">לא נכון</button>
+                                <button data-correct="true" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">נכון</button>
+                            </div>
+                            <div class="quiz-feedback">
+                                <span class="font-bold">תשובה: נכון.</span>
+                                <span>אופרטור אוניטרי שומר על המכפלה הפנימית ($\langle Tu, Tv \rangle = \langle u, v \rangle$), ומכאן נובע שהוא שומר גם על הנורמה המושרת ממנה ($||Tv|| = ||v||$).</span>
+                            </div>
+                        </div>
+
+                        <div class="quiz-question p-4 border rounded-lg">
+                            <p class="font-semibold text-lg">4. לפי המשפט הספקטרלי, כל מטריצה לכסינה היא גם נורמלית.</p>
+                            <div class="mt-3 space-x-3 space-x-reverse">
+                                <button data-correct="true" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">לא נכון</button>
+                                <button data-correct="false" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">נכון</button>
+                            </div>
+                            <div class="quiz-feedback">
+                                <span class="font-bold">תשובה: לא נכון.</span>
+                                <span>המשפט הספקטרלי קובע שאופרטור הוא נורמלי אם ורק אם הוא לכסין *אוניטרית* (כלומר, יש לו בסיס אורתונורמלי של ו"ע). ישנן מטריצות לכסינות שאינן נורמליות.</span>
+                            </div>
+                        </div>
+
+                        <div class="quiz-question p-4 border rounded-lg">
+                            <p class="font-semibold text-lg">5. הערכים הסינגולריים של מטריצה יכולים להיות שליליים.</p>
+                            <div class="mt-3 space-x-3 space-x-reverse">
+                                <button data-correct="true" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">לא נכון</button>
+                                <button data-correct="false" class="quiz-btn px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">נכון</button>
+                            </div>
+                            <div class="quiz-feedback">
+                                <span class="font-bold">תשובה: לא נכון.</span>
+                                <span>הערכים הסינגולריים מוגדרים כשורשים ריבועיים של הערכים העצמיים של $A^*A$ (שהם תמיד אי-שליליים), ולכן הם תמיד מספרים ממשיים אי-שליליים.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <section id="main-theorem" class="content-section">
+                 <div class="bg-white p-6 rounded-lg shadow-md space-y-8">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-teal-700 mb-4">המשפט המרכזי על לכסון אורתוגונלי</h2>
+                        <p class="mb-4">משפט זה עונה על שאלה מרכזית: מתי אופרטור ניתן ללכסון על ידי בסיס אורתונורמלי? התשובה תלויה בשדה שמעליו עובדים.</p>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                 <h3 class="text-xl font-bold text-slate-700 mb-2">מעל $\mathbb{C}$ (השדה המרוכב)</h3>
+                                 <p>אופרטור $T$ הוא <strong>נורמלי</strong> אם ורק אם קיים לו בסיס אורתונורמלי של וקטורים עצמיים.</p>
+                            </div>
+                             <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                 <h3 class="text-xl font-bold text-slate-700 mb-2">מעל $\mathbb{R}$ (השדה הממשי)</h3>
+                                 <p>אופרטור $T$ הוא <strong>צמוד עצמית (סימטרי)</strong> אם ורק אם קיים לו בסיס אורתונורמלי של וקטורים עצמיים.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-semibold text-teal-700 mb-4">משמעות בלשון מטריצות</h3>
+                        <p class="mb-4">ניתן לנסח את המשפט באופן שקול עבור מטריצות:</p>
+                        <div class="grid md:grid-cols-2 gap-6">
+                             <div class="p-4 bg-teal-50 rounded-lg">
+                                 <h4 class="font-bold text-teal-800 mb-2">לכסון אוניטרי ($\mathbb{C}$):</h4>
+                                 <p>מטריצה $A \in M_n(\mathbb{C})$ היא <strong>נורמלית</strong> ($AA^*=A^*A$) אם ורק אם היא <strong>לכסינה אוניטרית</strong>, כלומר קיימת מטריצה אוניטרית $P$ ($P^*=P^{-1}$) כך ש-$P^*AP$ היא מטריצה אלכסונית.</p>
+                            </div>
+                             <div class="p-4 bg-teal-50 rounded-lg">
+                                 <h4 class="font-bold text-teal-800 mb-2">לכסון אורתוגונלי ($\mathbb{R}$):</h4>
+                                 <p>מטריצה $A \in M_n(\mathbb{R})$ היא <strong>סימטרית</strong> ($A=A^T$) אם ורק אם היא <strong>לכסינה אורתוגונלית</strong>, כלומר קיימת מטריצה אורתוגונלית $P$ ($P^T=P^{-1}$) כך ש-$P^TAP$ היא מטריצה אלכסונית.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="spectral-decomposition" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md space-y-8">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-teal-700 mb-4">המשפט הספקטרלי (פירוק ספקטרלי)</h2>
+                        <p class="mb-4">כמסקנה מהמשפט המרכזי, ניתן להראות שאם אופרטור הוא נורמלי (מעל $\mathbb{C}$) או צמוד עצמית (מעל $\mathbb{R}$), אז ניתן להציג אותו בצורה הבאה, המכונה "פירוק ספקטרלי":</p>
+                        <p class="text-center text-lg p-4 bg-slate-100 rounded-lg my-4">$T = \sum_{i=1}^{k} \lambda_{i} P_{i}$</p>
+                        <ul class="list-disc list-inside space-y-2 mb-6">
+                           <li>$\lambda_i$ הם הערכים העצמיים השונים של T.</li>
+                           <li>$P_i$ היא ההטלה האורתוגונלית על המרחב העצמי המתאים ל-$\lambda_i$.</li>
+                           <li>הצגה זו מראה כיצד האופרטור "מותח" או "מכווץ" כל מרחב עצמי בנפרד, בהתאם לערך העצמי שלו.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-teal-700 mb-4">הדגמה אינטראקטיבית של פירוק ספקטרלי</h3>
+                        <p class="mb-6">הזינו מטריצה סימטרית 2x2. ההדגמה תחשב את הווקטורים העצמיים (שהם צירים אורתוגונליים) ותראה כיצד המטריצה מותחת את מעגל היחידה לאליפסה לאורך צירים אלו.</p>
+                        <div class="grid md:grid-cols-2 gap-8 items-start">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="font-bold">הזן מטריצה סימטרית 2x2 (A):</label>
+                                    <div class="grid grid-cols-2 gap-2 mt-2 p-2 border rounded-lg bg-slate-50" dir="ltr">
+                                        <input type="number" id="s_a" value="3" class="p-2 border rounded-md text-center">
+                                        <input type="number" id="s_b" value="1" class="p-2 border rounded-md text-center">
+                                        <input type="number" id="s_c" value="1" class="p-2 border rounded-md text-center bg-slate-200" disabled>
+                                        <input type="number" id="s_d" value="2" class="p-2 border rounded-md text-center">
+                                    </div>
+                                </div>
+                                <button id="spectralVisualizeBtn" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors">הפעל הדגמה</button>
+                                <div id="spectral-data" class="space-y-2 text-sm"></div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="spectralChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="svd-intro" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">מבוא לפירוק ערכים סינגולריים (SVD)</h2>
+                    <div class="p-4 bg-yellow-50 border-r-4 border-yellow-400 rounded mb-6">
+                        <p><strong class="font-medium">המוטיבציה:</strong> המשפט הספקטרלי חל רק על אופרטורים נורמליים (כלומר, מטריצות ריבועיות). מה לגבי העתקות ליניאריות כלליות, כולל כאלה בין מרחבים מממדים שונים (מטריצות מלבניות)?</p>
+                    </div>
+                    <p class="mb-4">פירוק SVD (Singular Value Decomposition) הוא הכללה עוצמתית של לכסון אורתוגונלי שחלה על <strong>כל</strong> מטריצה $A \in \mathbb{F}^{m \times n}$.</p>
+                    <p class="text-center text-lg p-4 bg-slate-100 rounded-lg my-4">$A = U \Sigma V^*$</p>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>$U$ (בגודל $m \times m$) ו-$V$ (בגודל $n \times n$) הן מטריצות אוניטריות/אורתוגונליות.</li>
+                        <li>$\Sigma$ (בגודל $m \times n$) היא מטריצה "אלכסונית" (איבריה מחוץ לאלכסון הראשי הם 0).</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <section id="svd-components" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">הרכיבים של פירוק SVD</h2>
+                    <p class="text-center text-lg p-4 bg-slate-100 rounded-lg my-4">$A = U \Sigma V^*$</p>
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="font-semibold text-lg">ערכים סינגולריים ($\sigma_i$ באלכסון של $\Sigma$)</h3>
+                            <p>הם השורשים הריבועיים של הערכים העצמיים של המטריצה החיובית-למחצה $A^*A$. הם תמיד ממשיים ואי-שליליים, ומסודרים בגודל יורד: $\sigma_1 \ge \sigma_2 \ge \dots \ge 0$.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg">מטריצה V (וקטורים סינגולריים ימניים)</h3>
+                            <p>עמודות $V$ הן וקטורים עצמיים אורתונורמליים של $A^*A$. הם מהווים בסיס אורתונורמלי למרחב התחום של A.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg">מטריצה U (וקטורים סינגולריים שמאליים)</h3>
+                            <p>עמודות $U$ הן וקטורים עצמיים אורתונורמליים של $AA^*$. הם מהווים בסיס אורתונורמלי למרחב הטווח של A.</p>
+                        </div>
+                        <div class="p-4 bg-teal-50 border-r-4 border-teal-500 rounded">
+                            <p>קיים קשר חשוב בין הווקטורים: $Av_i = \sigma_i u_i$. קשר זה הוא לב ליבו של הפירוק.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="svd-process" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">תהליך מציאת פירוק SVD</h2>
+                    <div class="flex flex-col md:flex-row gap-6">
+                        <div class="flex-1 p-4 border rounded-lg">
+                            <h3 class="text-lg font-bold mb-2">1. חישוב V ו-&Sigma;</h3>
+                            <ol class="list-decimal list-inside space-y-2">
+                                <li>חשב את המטריצה $A^*A$.</li>
+                                <li>מצא את הע"ע $\mu_1, \dots, \mu_n$ ואת הו"ע המתאימים והמנורמלים $v_1, \dots, v_n$.</li>
+                                <li>הערכים הסינגולריים הם $\sigma_i = \sqrt{\mu_i}$. בנה את המטריצה $\Sigma$.</li>
+                                <li>הרכב את $V$ מהווקטורים $v_i$ כעמודות.</li>
+                            </ol>
+                        </div>
+                        <div class="flex-1 p-4 border rounded-lg">
+                            <h3 class="text-lg font-bold mb-2">2. חישוב U</h3>
+                            <ol class="list-decimal list-inside space-y-2">
+                                <li>עבור כל $\sigma_i \ne 0$, מצא את $u_i$ בעזרת הנוסחה: $u_i = \frac{1}{\sigma_i}Av_i$.</li>
+                                <li>אם יש צורך, השלם את קבוצת ה-$u_i$ לבסיס אורתונורמלי.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="svd-interactive" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-teal-700 mb-4">הדגמה אינטראקטיבית של SVD</h2>
+                    <p class="mb-6">פירוק SVD מפרק כל טרנספורמציה ליניארית לשלושה שלבים גיאומטריים: סיבוב ($V^*$), מתיחה/כיווץ לאורך הצירים ($\Sigma$), וסיבוב נוסף ($U$). כאן תוכלו לראות זאת בפעולה על ידי הזנת מטריצת 2x2 וצפייה בשינוי של מעגל היחידה.</p>
+                    <div class="grid md:grid-cols-2 gap-8 items-start">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="font-bold">הזן מטריצה 2x2 (A):</label>
+                                <div class="grid grid-cols-2 gap-2 mt-2 p-2 border rounded-lg bg-slate-50">
+                                    <input type="number" id="a11" value="1" class="p-2 border rounded-md text-center">
+                                    <input type="number" id="a12" value="2" class="p-2 border rounded-md text-center">
+                                    <input type="number" id="a21" value="0" class="p-2 border rounded-md text-center">
+                                    <input type="number" id="a22" value="2" class="p-2 border rounded-md text-center">
+                                </div>
+                            </div>
+                            <button id="visualizeBtn" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors">הפעל הדגמה</button>
+                            <div id="svd-matrices" class="space-y-2 text-sm"></div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="svdChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // The onload attribute on the KaTeX script tag now handles rendering.
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+
+            function updateActiveState() {
+                const hash = window.location.hash || '#concepts';
+                
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === hash);
+                });
+
+                contentSections.forEach(section => {
+                    section.classList.toggle('active', '#' + section.id === hash);
+                });
+            }
+
+            window.addEventListener('hashchange', updateActiveState);
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.hash = link.getAttribute('href');
+                });
+            });
+
+            updateActiveState();
+
+            // True/False Quiz logic
+            const quizQuestions = document.querySelectorAll('.quiz-question');
+            quizQuestions.forEach(question => {
+                const buttons = question.querySelectorAll('.quiz-btn');
+                const feedbackEl = question.querySelector('.quiz-feedback');
+                
+                buttons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const isCorrect = button.dataset.correct === 'true';
+                        
+                        feedbackEl.style.display = 'block';
+                        if (isCorrect) {
+                            feedbackEl.classList.add('correct');
+                        } else {
+                            feedbackEl.classList.add('incorrect');
+                        }
+                        
+                        buttons.forEach(btn => {
+                            btn.disabled = true;
+                            btn.classList.add('opacity-50', 'cursor-not-allowed');
+                            if (btn.dataset.correct === 'true') {
+                                btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
+                            } else {
+                                btn.classList.add('bg-red-200');
+                            }
+                        });
+                    });
+                });
+            });
+            
+            // Matching Quiz Logic
+            function setupMatchingQuiz(quizId, feedbackId) {
+                const quiz = document.getElementById(quizId);
+                if (!quiz) return;
+                const items = Array.from(quiz.querySelectorAll('.match-item'));
+                const feedbackEl = document.getElementById(feedbackId);
+                
+                let state = {
+                    selectedItem: null,
+                    correctPairs: 0,
+                    totalPairs: quiz.querySelector('div').children.length
+                };
+
+                const reset = () => {
+                    state.selectedItem = null;
+                    state.correctPairs = 0;
+                    items.forEach(item => {
+                        item.classList.remove('selected', 'correct', 'incorrect');
+                        item.disabled = false;
+                    });
+                    if(feedbackEl) feedbackEl.textContent = '';
+                    if(feedbackEl) feedbackEl.className = 'mt-4 text-center font-semibold h-6';
+                };
+
+                items.forEach(item => {
+                    item.addEventListener('click', () => {
+                        if (item.classList.contains('correct')) return;
+
+                        if (!state.selectedItem) {
+                            item.classList.add('selected');
+                            state.selectedItem = item;
+                            if(feedbackEl) feedbackEl.textContent = '';
+                        } else {
+                            if (state.selectedItem.parentElement === item.parentElement) {
+                                state.selectedItem.classList.remove('selected');
+                                item.classList.add('selected');
+                                state.selectedItem = item;
+                                return;
+                            }
+
+                            if (state.selectedItem.dataset.matchId === item.dataset.matchId) {
+                                state.selectedItem.classList.remove('selected');
+                                item.classList.remove('selected');
+                                state.selectedItem.classList.add('correct');
+                                item.classList.add('correct');
+                                state.selectedItem.disabled = true;
+                                item.disabled = true;
+                                state.selectedItem = null;
+                                if(feedbackEl) feedbackEl.textContent = 'נכון מאוד!';
+                                if(feedbackEl) feedbackEl.className = 'mt-4 text-center font-semibold h-6 text-green-600';
+                                state.correctPairs++;
+
+                                if (state.correctPairs === state.totalPairs) {
+                                    if(feedbackEl) feedbackEl.textContent = 'כל הכבוד! סיימת את החלק הזה.';
+                                }
+                            } else {
+                                state.selectedItem.classList.add('incorrect');
+                                item.classList.add('incorrect');
+                                if(feedbackEl) feedbackEl.textContent = 'לא נכון, נסו שוב.';
+                                if(feedbackEl) feedbackEl.className = 'mt-4 text-center font-semibold h-6 text-red-600';
+                                
+                                const oldSelectedItem = state.selectedItem;
+                                setTimeout(() => {
+                                    oldSelectedItem.classList.remove('incorrect', 'selected');
+                                    item.classList.remove('incorrect', 'selected');
+                                    if(feedbackEl) feedbackEl.textContent = '';
+                                }, 1000);
+                                state.selectedItem = null;
+                            }
+                        }
+                    });
+                });
+
+                return reset;
+            }
+
+            const resetRieszQuiz = setupMatchingQuiz('riesz-quiz', 'riesz-feedback');
+            const resetAdjointQuiz = setupMatchingQuiz('adjoint-quiz', 'adjoint-feedback');
+
+            const resetBtn = document.getElementById('reset-quizzes');
+            if(resetBtn) {
+                 resetBtn.addEventListener('click', () => {
+                    if(resetRieszQuiz) resetRieszQuiz();
+                    if(resetAdjointQuiz) resetAdjointQuiz();
+                });
+            }
+
+            // Charting Logic
+            function generateCirclePoints(numPoints = 100) {
+                const points = [];
+                for (let i = 0; i <= numPoints; i++) {
+                    const angle = (i / numPoints) * 2 * Math.PI;
+                    points.push({ x: Math.cos(angle), y: Math.sin(angle) });
+                }
+                return points;
+            }
+            
+            function transformPoints(points, matrix) {
+                return points.map(p => ({
+                    x: matrix[0][0] * p.x + matrix[0][1] * p.y,
+                    y: matrix[1][0] * p.x + matrix[1][1] * p.y
+                }));
+            }
+
+            // SVD Visualization
+            const svdCtx = document.getElementById('svdChart')?.getContext('2d');
+            let svdChart;
+            const visualizeBtn = document.getElementById('visualizeBtn');
+            const matricesDiv = document.getElementById('svd-matrices');
+
+            function createSVDChart(datasets) {
+                if (svdChart) svdChart.destroy();
+                svdChart = new Chart(svdCtx, {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { min: -4, max: 4, grid: { color: '#e2e8f0' } }, y: { min: -4, max: 4, grid: { color: '#e2e8f0' } } },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        animation: { duration: 500 }
+                    }
+                });
+            }
+            
+            function multiply(A, B) { return [[A[0][0]*B[0][0] + A[0][1]*B[1][0], A[0][0]*B[0][1] + A[0][1]*B[1][1]], [A[1][0]*B[0][0] + A[1][1]*B[1][0], A[1][0]*B[0][1] + A[1][1]*B[1][1]]]; }
+            function transpose(A) { return [[A[0][0], A[1][0]], [A[0][1], A[1][1]]]; }
+            
+            function calculateSVD(A) {
+                const At = transpose(A); const AtA = multiply(At, A);
+                const a = AtA[0][0], b = AtA[0][1], c = AtA[1][0], d = AtA[1][1];
+                const trace = a + d; const det = a * d - b * c;
+                const mu1 = (trace + Math.sqrt(Math.max(0, trace*trace - 4*det))) / 2;
+                const mu2 = (trace - Math.sqrt(Math.max(0, trace*trace - 4*det))) / 2;
+                const s1 = Math.sqrt(Math.max(0, mu1)); const s2 = Math.sqrt(Math.max(0, mu2));
+                let v1, v2;
+                if (b === 0) { v1 = [1, 0]; v2 = [0, 1]; } else {
+                    const v1_raw = [b, mu1 - a]; const norm1 = Math.sqrt(v1_raw[0]*v1_raw[0] + v1_raw[1]*v1_raw[1]); v1 = [v1_raw[0]/norm1, v1_raw[1]/norm1];
+                    const v2_raw = [b, mu2 - a]; const norm2 = Math.sqrt(v2_raw[0]*v2_raw[0] + v2_raw[1]*v2_raw[1]); v2 = [v2_raw[0]/norm2, v2_raw[1]/norm2];
+                }
+                let u1, u2;
+                if (s1 > 1e-9) { const Av1 = [A[0][0]*v1[0] + A[0][1]*v1[1], A[1][0]*v1[0] + A[1][1]*v1[1]]; u1 = [Av1[0]/s1, Av1[1]/s1]; } else { u1 = [1, 0]; }
+                if (s2 > 1e-9) { const Av2 = [A[0][0]*v2[0] + A[0][1]*v2[1], A[1][0]*v2[0] + A[1][1]*v2[1]]; u2 = [Av2[0]/s2, Av2[1]/s2]; } else { u2 = [-u1[1], u1[0]]; }
+                const U = [[u1[0], u2[0]], [u1[1], u2[1]]]; const Sigma = [[s1, 0], [0, s2]]; const V = [[v1[0], v2[0]], [v1[1], v2[1]]];
+                if (u1[0]*u2[1] - u1[1]*u2[0] < 0) { U[0][1] *= -1; U[1][1] *= -1; }
+                return { U, Sigma, V };
+            }
+
+            function formatMatrix(name, M) { const f = (n) => n.toFixed(2); return `<div><span class="font-bold">${name} = </span><span class="font-mono">[ [${f(M[0][0])}, ${f(M[0][1])}], [${f(M[1][0])}, ${f(M[1][1])}] ]</span></div>`; }
+
+            function runSVDVisualization() {
+                if(!svdCtx) return;
+                const a11 = parseFloat(document.getElementById('a11').value) || 0; const a12 = parseFloat(document.getElementById('a12').value) || 0;
+                const a21 = parseFloat(document.getElementById('a21').value) || 0; const a22 = parseFloat(document.getElementById('a22').value) || 0;
+                const A = [[a11, a12], [a21, a22]];
+                const { U, Sigma, V } = calculateSVD(A); const Vt = transpose(V);
+                if(matricesDiv) matricesDiv.innerHTML = formatMatrix('U', U) + formatMatrix('&Sigma;', Sigma) + formatMatrix('V', V);
+                const initialPoints = generateCirclePoints(); const basisVectors = [{x:0, y:0}, {x:1, y:0}, {x:0,y:0}, {x:0, y:1}];
+                const baseDataset = (p, c) => ({ data: p, backgroundColor: c, pointRadius: 2, borderWidth: 0 });
+                const vectorDataset = (v, c) => ({ data: v, borderColor: c, borderWidth: 3, type: 'line', showLine: true, pointRadius: 0, fill: false });
+                createSVDChart([baseDataset(initialPoints, 'rgba(203, 213, 225, 0.8)'), vectorDataset(basisVectors.slice(0, 2), '#f87171'), vectorDataset(basisVectors.slice(2, 4), '#60a5fa')]);
+                setTimeout(() => { const p = transformPoints(initialPoints, Vt); const v = transformPoints(basisVectors, Vt); svdChart.data.datasets.push(baseDataset(p, 'rgba(165, 180, 252, 0.5)'), vectorDataset(v.slice(0, 2), '#c084fc'), vectorDataset(v.slice(2, 4), '#c084fc')); svdChart.update(); }, 800);
+                setTimeout(() => { const p = transformPoints(transformPoints(initialPoints, Vt), Sigma); const v = transformPoints(transformPoints(basisVectors, Vt), Sigma); svdChart.data.datasets.push(baseDataset(p, 'rgba(134, 239, 172, 0.5)'), vectorDataset(v.slice(0, 2), '#fb923c'), vectorDataset(v.slice(2, 4), '#fb923c')); svdChart.update(); }, 1600);
+                setTimeout(() => { const p = transformPoints(initialPoints, A); const v = transformPoints(basisVectors, A); svdChart.data.datasets.push(baseDataset(p, 'rgba(14, 165, 233, 0.8)'), vectorDataset(v.slice(0, 2), '#10b981'), vectorDataset(v.slice(2, 4), '#10b981')); svdChart.update(); }, 2400);
+            }
+
+            if(visualizeBtn) {
+                visualizeBtn.addEventListener('click', runSVDVisualization);
+                runSVDVisualization();
+            }
+
+            // Spectral Visualization
+            const spectralCtx = document.getElementById('spectralChart')?.getContext('2d');
+            let spectralChart;
+            const spectralVisualizeBtn = document.getElementById('spectralVisualizeBtn');
+            const spectralDataDiv = document.getElementById('spectral-data');
+            const s_b_input = document.getElementById('s_b');
+            const s_c_input = document.getElementById('s_c');
+            if(s_b_input && s_c_input) {
+                s_b_input.addEventListener('input', () => s_c_input.value = s_b_input.value);
+            }
+
+            function createSpectralChart(datasets) {
+                if (spectralChart) spectralChart.destroy();
+                spectralChart = new Chart(spectralCtx, {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { min: -4, max: 4, grid: { color: '#e2e8f0' } }, y: { min: -4, max: 4, grid: { color: '#e2e8f0' } } },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    }
+                });
+            }
+
+            function calculateEigen(A) {
+                const a = A[0][0], b = A[0][1], d = A[1][1];
+                const trace = a + d;
+                const det = a * d - b * b;
+                const sqrt_discriminant = Math.sqrt(Math.max(0, trace * trace - 4 * det));
+                const lambda1 = (trace + sqrt_discriminant) / 2;
+                const lambda2 = (trace - sqrt_discriminant) / 2;
+                
+                let v1;
+                // Eigenvector for lambda1
+                const v1_raw = [b, lambda1 - a];
+                const norm1 = Math.sqrt(v1_raw[0]*v1_raw[0] + v1_raw[1]*v1_raw[1]);
+
+                if (norm1 < 1e-9) {
+                    // This happens when b=0 and lambda1=a, i.e., for a diagonal matrix A=diag(a,d) with a>=d,
+                    // or for a scalar matrix A=a*I. In both cases, (1,0) is a valid eigenvector.
+                    v1 = [1, 0];
+                } else {
+                    v1 = [v1_raw[0] / norm1, v1_raw[1] / norm1];
+                }
+
+                // For a symmetric matrix, the other eigenvector is orthogonal.
+                const v2 = [-v1[1], v1[0]];
+                
+                return { lambda1, lambda2, v1, v2 };
+            }
+
+            function formatVector(name, v, lambda) {
+                const f = (n) => n.toFixed(2);
+                return `<div><span class="font-bold">${name}</span> (ע"ע ${f(lambda)}): <span class="font-mono">[${f(v[0])}, ${f(v[1])}]</span></div>`;
+            }
+
+            function runSpectralVisualization() {
+                if (!spectralCtx) return;
+                const a = parseFloat(document.getElementById('s_a').value) || 0;
+                const b = parseFloat(document.getElementById('s_b').value) || 0;
+                const d = parseFloat(document.getElementById('s_d').value) || 0;
+                const A = [[a, b], [b, d]];
+
+                const { lambda1, lambda2, v1, v2 } = calculateEigen(A);
+                if(spectralDataDiv) {
+                    spectralDataDiv.innerHTML = formatVector('v1', v1, lambda1) + formatVector('v2', v2, lambda2);
+                }
+
+                const initialPoints = generateCirclePoints();
+                const transformedPoints = transformPoints(initialPoints, A);
+
+                const eigenvector1 = [{x:0, y:0}, {x: v1[0]*4, y: v1[1]*4}, {x:0, y:0}, {x: -v1[0]*4, y: -v1[1]*4}];
+                const eigenvector2 = [{x:0, y:0}, {x: v2[0]*4, y: v2[1]*4}, {x:0, y:0}, {x: -v2[0]*4, y: -v2[1]*4}];
+
+                const baseDataset = (p, c) => ({ data: p, backgroundColor: c, pointRadius: 2, borderWidth: 0 });
+                const vectorDataset = (v, c) => ({ data: v, borderColor: c, borderWidth: 3, type: 'line', showLine: true, pointRadius: 0, fill: false, borderDash: [5, 5] });
+                
+                createSpectralChart([
+                    baseDataset(initialPoints, 'rgba(203, 213, 225, 0.8)'),
+                    baseDataset(transformedPoints, 'rgba(14, 165, 233, 0.8)'),
+                    vectorDataset(eigenvector1, '#f87171'),
+                    vectorDataset(eigenvector2, '#60a5fa')
+                ]);
+            }
+            
+            if(spectralVisualizeBtn) {
+                spectralVisualizeBtn.addEventListener('click', runSpectralVisualization);
+                runSpectralVisualization();
+            }
+        });
+    </script>
+</body>
+</html>
+
